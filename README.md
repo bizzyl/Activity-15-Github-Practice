@@ -29,7 +29,7 @@ The data used for Activity #14 comes from the Armed Forces Dataset as well as th
 * **Branches:** The `main` branch contains the final version of the files. The feature branch shows the development history.
 * **Issues:** The Issues tab tracks project tasks and requirements.
 
-## 📧 Contact Information
+## Contact Information
 * **Submitted By:** Luke Bislig
 * **GitHub Username:** bizzyl
 * **Email:** lxb5609@psu.edu
