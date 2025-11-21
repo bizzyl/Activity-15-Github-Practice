@@ -1,0 +1,366 @@
+---
+title: "Activity #14 My First QMD File"
+author: "Luke Bislig"
+date: "November 17, 2025"
+format: pdf
+editor: visual
+---
+
+
+# data wrangling code for armed forces data
+
+library(tidyverse)
+library(rvest)
+library(googlesheets4)
+
+# scrape the ranked data
+webRanks <- read_html("https://neilhatfield.github.io/Stat184_PayGradeRanks.html") %>%
+  html_elements(css = "table") %>%
+  html_table()
+
+rawRanks <- webRanks[[1]] # Extract the data frame of ranks
+
+# wrangle ranked data
+## clean data
+rawRanks[1, 1] <- "Type"
+rankHeaders <- rawRanks[1, ]
+names(rawRanks) <- rankHeaders[1,]
+rawRanks <- rawRanks[-c(1, 26), ]
+
+cleanRanks <- rawRanks %>%
+  dplyr::select(!Type) %>% # Remove extra column
+  pivot_longer(
+    cols = !`Pay Grade`, # The improper name requires backticks
+    names_to = "Branch",
+    values_to = "Rank"
+  ) %>%
+  mutate(
+    Rank = na_if(x = Rank, y = "--")
+  )
+
+
+#load the armed forces data
+gs4_deauth()
+forcesHeaders <- read_sheet(
+  ss = "https://docs.google.com/spreadsheets/d/1cn4i0-ymB1ZytWXCwsJiq6fZ9PhGLUvbMBHlzqG4bwo/edit?usp=sharing",
+  col_names = FALSE, # Turn off Column Names
+  n_max = 3 # read only the first three rows
+)
+
+rawForces <- read_sheet(
+  ss = "https://docs.google.com/spreadsheets/d/1cn4i0-ymB1ZytWXCwsJiq6fZ9PhGLUvbMBHlzqG4bwo/edit?usp=sharing",
+  col_names = FALSE, # Turn off Column Names
+  skip = 3, # Skip the first three rows
+  n_max = 28, # Read only the next 28 rows; drops footer
+  col_types = "c" # Tells R to read everything as character data
+)
+
+# wrangle armed forces data 
+branchNames <- rep( # Create three copies of each branch
+  x = c("Army", "Navy", "Marine Corps", "Air Force", "Space Force", "Total"),
+  each = 3
+)
+tempHeaders <- paste( # Combine branch with other headers
+  c("", branchNames),
+  forcesHeaders[3,],
+  sep = "."
+)
+
+names(rawForces) <- tempHeaders
+
+cleanForces <- rawForces %>%
+  rename(Pay.Grade = `.Pay Grade`) %>%
+  dplyr::select(!contains("Total")) %>% # Remove total columns
+  filter(Pay.Grade != "Total Enlisted" &
+           Pay.Grade != "Total Warrant Officers" &
+           Pay.Grade != "Total Officers" &
+           Pay.Grade != "Total") %>% # Remove total rows; see note below
+  pivot_longer( # Reshape data
+    cols = !Pay.Grade,
+    names_to = "Branch.Sex",
+    values_to = "Frequency"
+  ) %>%
+  separate_wider_delim( # Separate branches and sex
+    cols = Branch.Sex,
+    delim = ".",
+    names = c("Branch", "Sex")
+  ) %>%
+  mutate(
+    Frequency = na_if(Frequency, y = "N/A*"), # Convert N/A* to missing
+    Frequency = parse_number(Frequency) # Parse values as numbers
+  )
+
+# merge the data frames
+key_forcesRanks <- left_join(
+  x = cleanForces,
+  y = cleanRanks,
+  by = join_by(Pay.Grade == `Pay Grade`, Branch == Branch)
+)
+
+# transform group to individual
+key_individualRanks <- key_forcesRanks %>%
+  filter(!is.na(Frequency)) %>% # Remove all cases with missing counts
+  uncount(
+    weights = Frequency
+  )
+
+altExample <- rawForces %>%
+  rename(Pay.Grade = `.Pay Grade`) %>%
+  filter(!grepl(pattern = "Total", x = Pay.Grade))
+
+rawForces <- read_sheet(
+  ss = "https://docs.google.com/spreadsheets/d/1cn4i0-ymB1ZytWXCwsJiq6fZ9PhGLUvbMBHlzqG4bwo/edit?usp=sharing",
+  col_names = FALSE,
+  skip = 3,
+  n_max = 28,
+  na = c("N/A*") # Tells R to treat the N/A* as missing values
+
+
+# visualization for armed forces
+```{r}
+echo=FALSE
+library(tidyverse)
+library(rvest)
+library(googlesheets4)
+library(kableExtra)
+# Scrape Rank Data 
+webRanks <- read_html("https://neilhatfield.github.io/Stat184_PayGradeRanks.html") %>%
+  html_elements(css = "table") %>%
+  html_table()
+
+rawRanks <- webRanks[[1]] # Extract the data frame of ranks
+
+# Wrangle Rank Data
+## Enter a value in the first cell (1, 1)
+rawRanks[1, 1] <- "Type"
+## Extract actual column headers
+rankHeaders <- rawRanks[1, ]
+## Apply headers as column names
+names(rawRanks) <- rankHeaders[1,]
+## Remove redundant first row and last row
+rawRanks <- rawRanks[-c(1, 26), ]
+
+cleanRanks <- rawRanks %>%
+  dplyr::select(!Type) %>% # Remove extra column
+  pivot_longer(
+    cols = !`Pay Grade`, # The improper name requires backticks
+    names_to = "Branch",
+    values_to = "Rank"
+  ) %>%
+  mutate(
+    Rank = na_if(x = Rank, y = "--")
+  )
+
+# Load Armed Forces Data
+gs4_deauth()
+forcesHeaders <- read_sheet(
+  ss = "https://docs.google.com/spreadsheets/d/1cn4i0-ymB1ZytWXCwsJiq6fZ9PhGLUvbMBHlzqG4bwo/edit?usp=sharing",
+  col_names = FALSE, # Turn off Column Names
+  n_max = 3 # read only the first three rows
+)
+
+rawForces <- read_sheet(
+  ss = "https://docs.google.com/spreadsheets/d/1cn4i0-ymB1ZytWXCwsJiq6fZ9PhGLUvbMBHlzqG4bwo/edit?usp=sharing",
+  col_names = FALSE, 
+  skip = 3,
+  n_max = 28, 
+  col_types = "c" 
+)
+
+# wrangled armed forces data
+
+branchNames <- rep( 
+  x = c("Army", "Navy", "Marine Corps", "Air Force", "Space Force", "Total"),
+  each = 3
+)
+tempHeaders <- paste(
+  c("", branchNames),
+  forcesHeaders[3,],
+  sep = "."
+)
+
+names(rawForces) <- tempHeaders
+
+cleanForces <- rawForces %>%
+  rename(Pay.Grade = `.Pay Grade`) %>%
+  dplyr::select(!contains("Total")) %>% # Remove total columns
+  filter(Pay.Grade != "Total Enlisted" &
+           Pay.Grade != "Total Warrant Officers" &
+           Pay.Grade != "Total Officers" &
+           Pay.Grade != "Total") %>% 
+  
+  pivot_longer(
+    cols = !Pay.Grade,
+    names_to = "Branch.Sex",
+    values_to = "Frequency"
+  ) %>%
+  separate_wider_delim(
+    cols = Branch.Sex,
+    delim = ".",
+    names = c("Branch", "Sex")
+  ) %>%
+  mutate(
+    Frequency = na_if(Frequency, y = "N/A*"), # Convert N/A* to missing
+    Frequency = parse_number(Frequency) # Parse values as numbers
+  )
+
+# merge dfs ----
+key_forcesRanks <- left_join(
+  x = cleanForces,
+  y = cleanRanks,
+  by = join_by(Pay.Grade == `Pay Grade`, Branch == Branch)
+)
+
+# transform group to individual ----
+key_individualRanks <- key_forcesRanks %>%
+  filter(!is.na(Frequency)) %>% # remove all cases with missing counts
+  uncount(
+    weights = Frequency
+  )
+
+
+altExample <- rawForces %>%
+  rename(Pay.Grade = `.Pay Grade`) %>%
+  filter(!grepl(pattern = "Total", x = Pay.Grade))
+
+rawForces <- read_sheet(
+  ss = "https://docs.google.com/spreadsheets/d/1cn4i0-ymB1ZytWXCwsJiq6fZ9PhGLUvbMBHlzqG4bwo/edit?usp=sharing",
+  col_names = FALSE,
+  skip = 3,
+  n_max = 28,
+  na = c("N/A*") # Tells R to treat the N/A* as missing values
+)
+kable(key_forcesRanks, caption = "Armed Forces Visualization")
+```
+
+# narrative text for armed forces
+
+The visualization presents a table showing military branch, personnel sex, pay grade, and frequency counts. While it includes ratios between men and women, sex and rank are independent variables, so differences between them do not imply causation. Even so, the table highlights several key insights. For example, the Army consistently has the largest number of personnel, while the Air Force and Space Force have the smallest. By illustrating these differences across service branches, the data offers useful context for understanding shifts in overall military composition.
+
+# popularity of the baby names
+
+# code for pop baby names 
+
+library(ggplot2)
+library(dplyr)
+library(tidyverse)
+
+instructors <- c("Mabel", "Bessie", "Catherine", "Elizabeth")
+
+subsetNames <- BabyNames %>%
+              filter(name %in% instructors) %>%
+              group_by(name, year) %>%
+              summarize(
+                total = sum(count),
+                .groups = "drop"
+---
+
+# visualization for popular baby names
+
+```{r}
+echo=FALSE
+
+library(ggplot2)
+library(dplyr)
+library(tidyverse)
+library(dcData)
+data("BabyNames")
+
+
+instructors <- c("Mabel", "Bessie", "Catherine", "Elizabeth")
+
+subsetNames <- BabyNames %>%
+              filter(name %in% instructors) %>%
+              group_by(name, year) %>%
+              summarize(
+                total = sum(count),
+                .groups = "drop"
+              )
+ggplot(subsetNames, mapping = aes(x = year, y = total)
+       ) + geom_line()
+
+psuPalette <- c("#1E407C", "#BC204B", "#3EA39E", "#E98300",
+                "#999999", "#AC8DCE", "#F2665E", "#99CC00")
+
+ggplot(subsetNames, mapping = aes(
+  x = year, 
+  y = total,
+  color = name,
+  linetype = name
+  )
+       ) + geom_line(linewidth = 0.75) +
+  labs(
+    title = "Popularity of the Stat 184 Instructor's First Names Over Time",
+    x = "Year",
+    y = "Total Number of People with Name",
+    color = "Name",
+    linetype = "Name"
+  ) + scale_y_continuous(
+    expand = expansion(mult = 0.01)
+  ) + scale_color_manual(
+    values = psuPalette
+  ) + 
+  theme_bw() +
+  theme(
+    text = element_text(size = 14),
+    legend.kermy.size = unit(1, "cm")
+  )
+```
+
+# narrative text for popular baby names
+
+alt text: Displaying multiple line graphs on a single plot to show the total number of people with each name across different years.
+
+long description: This visualization presents data for various given names over time. It includes four names and the specific years in which each was recorded. The line graph illustrates how often each name was used in those years. Each line corresponds to a different name, as shown in the legend. The lines reflect different patterns of change—some names rise again in popularity, others show steady declines, and some display fluctuating trends throughout the timeline.
+
+brief paragraph: This data visualization shows how many individuals were given a particular name in each year. It plots a separate line for every name, allowing viewers to see how the popularity of each name changes and grows over time.
+
+# plotting the mathematical function
+
+# code for the box problem
+
+---
+volume_box <- function(x){
+     vol <- (48-2*x)*(32-2*x)*(x)
+     return(vol)
+ }
+---
+
+# visualization for box problem
+
+```{r}
+library(ggplot2)
+
+volume_box <- function(x){
+     vol <- (48-2*x)*(32-2*x)*(x)
+     return(vol)
+}
+#if we want to see max volume at what x
+x_vals <- seq(0, 18, 0.01)
+volumes <- volume_box(x_vals)
+max_volume <- max(volumes)
+best_x <- x_vals[which.max(volumes)]
+
+max_volume
+best_x
+
+# create the plot
+ggplot(data = data.frame(x = c(0, 18)), aes(x = x)) +  # x ranges from 0 to half the smallest side
+  stat_function(fun = volume_box, color = "#0072B2", linewidth = 1) +
+  labs(
+    x = "Side Length of Square Cut (inches)",
+    y = "Volume (cubic inches)"
+  ) +
+  theme_minimal()
+```
+
+# narrative text for box problem
+
+The plot shows how the volume of a box with an open top changes as the side length x of the square cut from each corner increases. At first, as x increases from 0, the volume increases because the box gets taller, but beyond a certain point, the volume decreases because the base becomes too small.
+
+For a 36 × 48 inch piece of paper, the maximum volume occurs when x = 6.28 inches, which gives a maximum volume of 4326.629 cubic inches. This visualization helps us see that the optimal side length balances the height of the box with the area of the base to maximize volume. 
+
+# What You've Learned So Far
+
+So far in this activity, I’ve learned how to use R more, especially when it comes to working with real datasets. I got practice pulling data from the web, cleaning it up, and reshaping it into something usable. I also learned how to make clearer visualizations with ggplot2 and how to explain them using alt text and short descriptions. On top of that, writing a custom function for the box problem helped me see how R can be used to explore a mathematical idea and graph it. Overall, I’ve definitely gotten more comfortable using R to wrangle data, make plots, and communicate what the visuals show.
+
